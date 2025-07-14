@@ -43,6 +43,7 @@ func main() {
 
 	mux.HandleFunc("GET /api/items", config.HandlerGetItems)
 	mux.HandleFunc("GET /api/shopping_cart", config.HandlerGetShoppingCart)
+	mux.HandleFunc("GET /api/delete/{itemID}", config.HandlerDeleteFromCart)
 
 	mux.HandleFunc("POST /api/reg", config.HandlerRegUser)
 	mux.HandleFunc("POST /api/login", config.HandlerLogin)

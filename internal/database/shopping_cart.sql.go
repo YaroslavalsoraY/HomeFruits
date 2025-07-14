@@ -41,6 +41,30 @@ func (q *Queries) AddItemInCart(ctx context.Context, arg AddItemInCartParams) er
 	return err
 }
 
+const deleteFromCart = `-- name: DeleteFromCart :one
+DELETE FROM shopping_cart
+WHERE item_id = $1 AND user_id = $2
+RETURNING item_id, user_id, quantity, cost, item_name
+`
+
+type DeleteFromCartParams struct {
+	ItemID uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) DeleteFromCart(ctx context.Context, arg DeleteFromCartParams) (ShoppingCart, error) {
+	row := q.db.QueryRowContext(ctx, deleteFromCart, arg.ItemID, arg.UserID)
+	var i ShoppingCart
+	err := row.Scan(
+		&i.ItemID,
+		&i.UserID,
+		&i.Quantity,
+		&i.Cost,
+		&i.ItemName,
+	)
+	return i, err
+}
+
 const getShoppingCart = `-- name: GetShoppingCart :many
 SELECT item_id, user_id, quantity, cost, item_name FROM shopping_cart
 WHERE user_id = $1

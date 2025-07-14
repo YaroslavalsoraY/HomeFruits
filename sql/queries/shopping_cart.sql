@@ -11,3 +11,8 @@ VALUES (
     $4,
     $5
 );
+
+-- name: DeleteFromCart :one
+DELETE FROM shopping_cart
+WHERE item_id = $1 AND user_id = $2
+RETURNING *;

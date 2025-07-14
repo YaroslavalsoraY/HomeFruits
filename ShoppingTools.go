@@ -142,3 +142,56 @@ func (cfg *ApiConfig) HandlerGetInCart(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 }
+
+func (cfg *ApiConfig) HandlerDeleteFromCart(w http.ResponseWriter, r *http.Request) {
+	token, err := jwt.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		logger.Warn(err)
+		return
+	}
+
+	userID, err := jwt.ValidateJWT(token, cfg.SecretJWT)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		logger.Warn(err)
+		return
+	}
+
+	itemID, err := uuid.Parse(r.PathValue("itemID"))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		logger.Warn(err)
+		return
+	}
+	
+	args := database.DeleteFromCartParams{
+		ItemID: itemID,
+		UserID: userID,
+	}
+	deletedItem, err := cfg.Queries.DeleteFromCart(context.Background(), args)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		logger.Warn(err)
+		return
+	}
+
+	realItem, err := cfg.Queries.GetItemById(context.Background(), deletedItem.ItemID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		logger.Warn(err)
+		return
+	}
+
+	err = cfg.Queries.UpdateItemQuantity(context.Background(), database.UpdateItemQuantityParams{
+		Quantity: realItem.Quantity + deletedItem.Quantity,
+		ID: deletedItem.ItemID,
+	})
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		logger.Warn(err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
