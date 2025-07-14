@@ -16,7 +16,7 @@ type GetItemParams struct {
 	UserID   uuid.UUID
 	Name     string
 	Quantity int `json:"quantity"`
-	Cost     int `json:"cost"`
+	Cost     int
 }
 
 func (cfg *ApiConfig) HandlerGetItems(w http.ResponseWriter, r *http.Request) {
@@ -52,12 +52,14 @@ func (cfg *ApiConfig) HandlerGetShoppingCart(w http.ResponseWriter, r *http.Requ
 
 	shoppingCart, err := cfg.Queries.GetShoppingCart(context.Background(), userID)
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
 	respData, err := json.Marshal(shoppingCart)
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
@@ -83,23 +85,31 @@ func (cfg *ApiConfig) HandlerGetInCart(w http.ResponseWriter, r *http.Request) {
 
 	itemID, err := uuid.Parse(r.PathValue("itemID"))
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
-	itemName, err := cfg.Queries.GetItemNameById(context.Background(), itemID)
+	item, err := cfg.Queries.GetItemById(context.Background(), itemID)
 
 	newItemInCart := GetItemParams{
 		UserID: userID,
 		ItemID: itemID,
-		Name: itemName,
+		Name:   item.Name,
+		Cost:   int(item.Cost),
 	}
 
 	decoder := json.NewDecoder(r.Body)
 
 	err = decoder.Decode(&newItemInCart)
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		logger.Warn(err)
+		return
+	}
+
+	if newItemInCart.Quantity > int(item.Quantity) {
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -113,7 +123,22 @@ func (cfg *ApiConfig) HandlerGetInCart(w http.ResponseWriter, r *http.Request) {
 
 	err = cfg.Queries.AddItemInCart(context.Background(), args)
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
+
+	updateArgs := database.UpdateItemQuantityParams{
+		Quantity: item.Quantity - int32(newItemInCart.Quantity),
+		ID:       itemID,
+	}
+
+	err = cfg.Queries.UpdateItemQuantity(context.Background(), updateArgs)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		logger.Warn(err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

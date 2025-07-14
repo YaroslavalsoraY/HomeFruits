@@ -11,6 +11,11 @@ VALUES(
 )
 RETURNING *;
 
--- name: GetItemNameById :one
-SELECT name FROM items
+-- name: GetItemById :one
+SELECT name, cost, quantity FROM items
 WHERE id = $1;
+
+-- name: UpdateItemQuantity :exec
+UPDATE items
+SET quantity = $1
+WHERE id = $2;
