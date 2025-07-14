@@ -46,9 +46,11 @@ func main() {
 
 	mux.HandleFunc("POST /api/reg", config.HandlerRegUser)
 	mux.HandleFunc("POST /api/login", config.HandlerLogin)
-	mux.HandleFunc("POST /admin/item", config.HandlerInsertItem)
 	mux.HandleFunc("POST /api/item/{itemID}", config.HandlerGetInCart)
 	mux.HandleFunc("POST /api/refresh", config.HandlerRefresh)
+
+	mux.HandleFunc("POST /admin/item", config.HandlerInsertItem)
+	mux.HandleFunc("GET /admin/revoke/{tokenID}", config.HandlerRevokeToken)
 
 	server := &http.Server{
 		Addr:    ":8080",

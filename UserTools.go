@@ -108,8 +108,21 @@ func (cfg *ApiConfig) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	refreshToken := jwt.MakeRefreshToken()
+	args := database.InsertNewRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    realPasswordAndId.ID,
+		ExpiresAt: time.Now().Add(EXPIRESEIN * time.Hour * 24),
+	}
+	err = cfg.Queries.InsertNewRefreshToken(context.Background(), args)
+	if err != nil {
+		logger.Warn(err)
+		return
+	}
+
 	userData.Password = "*********"
 	userData.Token = token
+	userData.RefreshToken = refreshToken
 
 	respData, err := json.Marshal(userData)
 

@@ -6,7 +6,6 @@ import (
 	"HomeFruits/logger"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
@@ -33,7 +32,6 @@ func (cfg *ApiConfig) HandlerInsertItem(w http.ResponseWriter, r *http.Request) 
 
 	email, err := cfg.Queries.GetUserEmail(context.Background(), adminID)
 	if err != nil {
-		fmt.Println(adminID)
 		logger.Warn(err)
 		return
 	}
@@ -63,4 +61,35 @@ func (cfg *ApiConfig) HandlerInsertItem(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (cfg *ApiConfig) HandlerRevokeToken(w http.ResponseWriter, r *http.Request) {
+	token, err := jwt.GetBearerToken(r.Header)
+	if err != nil {
+		logger.Warn(err)
+		return
+	}
+
+	adminID, err := jwt.ValidateJWT(token, cfg.SecretJWT)
+	if err != nil {
+		logger.Warn(err)
+		return
+	}
+
+	email, err := cfg.Queries.GetUserEmail(context.Background(), adminID)
+	if err != nil {
+		logger.Warn(err)
+		return
+	}
+	if email != cfg.AdminEmail {
+		w.WriteHeader(http.StatusUnavailableForLegalReasons)
+		logger.Warn(err)
+		return
+	}
+
+	tokenToRevoke := r.PathValue("tokenID")
+
+	cfg.Queries.RevokeToken(context.Background(), tokenToRevoke)
+
+	w.WriteHeader(http.StatusOK)
 }
