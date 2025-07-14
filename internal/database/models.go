@@ -6,6 +6,7 @@ package database
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -15,6 +16,13 @@ type Item struct {
 	Name     string
 	Quantity int32
 	Cost     int32
+}
+
+type RefreshToken struct {
+	Token     string
+	UserID    uuid.UUID
+	ExpiresAt time.Time
+	RevokedAt sql.NullTime
 }
 
 type ShoppingCart struct {

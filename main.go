@@ -48,6 +48,7 @@ func main() {
 	mux.HandleFunc("POST /api/login", config.HandlerLogin)
 	mux.HandleFunc("POST /admin/item", config.HandlerInsertItem)
 	mux.HandleFunc("POST /api/item/{itemID}", config.HandlerGetInCart)
+	mux.HandleFunc("POST /api/refresh", config.HandlerRefresh)
 
 	server := &http.Server{
 		Addr:    ":8080",

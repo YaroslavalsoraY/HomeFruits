@@ -13,9 +13,14 @@ import (
 )
 
 type User struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Token    string `json:"JWT,omitempty"`
+	Email        string `json:"email"`
+	Password     string `json:"password"`
+	Token        string `json:"JWT,omitempty"`
+	RefreshToken string
+}
+
+type Token struct {
+	Token string `json:"refresh_token"`
 }
 
 const EXPIRESEIN = 15
@@ -51,6 +56,19 @@ func (cfg *ApiConfig) HandlerRegUser(w http.ResponseWriter, r *http.Request) {
 		logger.Warn(err)
 		return
 	}
+
+	refreshToken := jwt.MakeRefreshToken()
+	args := database.InsertNewRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    createdUser.ID,
+		ExpiresAt: time.Now().Add(EXPIRESEIN * time.Hour * 24),
+	}
+	err = cfg.Queries.InsertNewRefreshToken(context.Background(), args)
+	if err != nil {
+		logger.Warn(err)
+		return
+	}
+	newUser.RefreshToken = refreshToken
 
 	logger.Info("New user created!")
 
@@ -94,6 +112,42 @@ func (cfg *ApiConfig) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 	userData.Token = token
 
 	respData, err := json.Marshal(userData)
+
+	w.Write(respData)
+}
+
+func (cfg *ApiConfig) HandlerRefresh(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	refreshToken := Token{}
+	err := decoder.Decode(&refreshToken)
+	if err != nil {
+		logger.Warn(err)
+		return
+	}
+
+	tokenInfo, err := cfg.Queries.GetRefreshToken(context.Background(), refreshToken.Token)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		logger.Warn(err)
+		return
+	}
+
+	if tokenInfo.RevokedAt.Valid || time.Now().After(tokenInfo.ExpiresAt) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	newAccessToken, err := jwt.MakeJWT(tokenInfo.UserID, cfg.SecretJWT, EXPIRESEIN * time.Minute)
+	if err != nil {
+		logger.Warn(err)
+		return
+	}
+
+	respData, err := json.Marshal(newAccessToken)
+	if err != nil {
+		logger.Warn(err)
+		return
+	}
 
 	w.Write(respData)
 }
