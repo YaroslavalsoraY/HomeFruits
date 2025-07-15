@@ -28,6 +28,7 @@ func main() {
 	if err != nil {
 		logger.HaltOnErr(err)
 	}
+	defer db.Close()
 
 	secretJWT := os.Getenv("SECRET_JWT")
 
@@ -43,15 +44,16 @@ func main() {
 
 	mux.HandleFunc("GET /api/items", config.HandlerGetItems)
 	mux.HandleFunc("GET /api/shopping_cart", config.HandlerGetShoppingCart)
-	mux.HandleFunc("GET /api/delete/{itemID}", config.HandlerDeleteFromCart)
 
 	mux.HandleFunc("POST /api/reg", config.HandlerRegUser)
 	mux.HandleFunc("POST /api/login", config.HandlerLogin)
 	mux.HandleFunc("POST /api/item/{itemID}", config.HandlerGetInCart)
 	mux.HandleFunc("POST /api/refresh", config.HandlerRefresh)
 
+	mux.HandleFunc("DELETE /api/delete/{itemID}", config.HandlerDeleteFromCart)
+
 	mux.HandleFunc("POST /admin/item", config.HandlerInsertItem)
-	mux.HandleFunc("GET /admin/revoke/{tokenID}", config.HandlerRevokeToken)
+	mux.HandleFunc("DELETE /admin/revoke/{tokenID}", config.HandlerRevokeToken)
 
 	server := &http.Server{
 		Addr:    ":8080",

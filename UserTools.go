@@ -30,12 +30,14 @@ func (cfg *ApiConfig) HandlerRegUser(w http.ResponseWriter, r *http.Request) {
 	newUser := User{}
 	err := decoder.Decode(&newUser)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with decoding json"}`, http.StatusInternalServerError)
 		logger.Warn(err, "problem with registration")
 		return
 	}
 
 	hashedPassword, err := hashfunc.HashingPassword(newUser.Password)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with hashing provided password"}`, http.StatusInternalServerError)
 		logger.Warn(err, "problem with hashing")
 		return
 	}
@@ -47,13 +49,14 @@ func (cfg *ApiConfig) HandlerRegUser(w http.ResponseWriter, r *http.Request) {
 
 	createdUser, err := cfg.Queries.CreateNewUser(context.Background(), arg)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
 	token, err := jwt.MakeJWT(createdUser.ID, cfg.SecretJWT, EXPIRESEIN*time.Minute)
 	if err != nil {
-		logger.Warn(err)
+		http.Error(w, `{"error": "Problem with making token"}`, http.StatusInternalServerError)
 		return
 	}
 
@@ -65,6 +68,7 @@ func (cfg *ApiConfig) HandlerRegUser(w http.ResponseWriter, r *http.Request) {
 	}
 	err = cfg.Queries.InsertNewRefreshToken(context.Background(), args)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
@@ -73,7 +77,7 @@ func (cfg *ApiConfig) HandlerRegUser(w http.ResponseWriter, r *http.Request) {
 	logger.Info("New user created!")
 
 	newUser.Token = token
-	newUser.Password = "*********"
+	newUser.Password = hashedPassword
 	respData, err := json.Marshal(newUser)
 
 	w.WriteHeader(http.StatusCreated)
@@ -85,12 +89,14 @@ func (cfg *ApiConfig) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 	userData := User{}
 	err := decoder.Decode(&userData)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with decoding json"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
 	realPasswordAndId, err := cfg.Queries.GetUserPassword(context.Background(), userData.Email)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
@@ -104,6 +110,7 @@ func (cfg *ApiConfig) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 
 	token, err := jwt.MakeJWT(realPasswordAndId.ID, cfg.SecretJWT, EXPIRESEIN*time.Minute)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with making token"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
@@ -116,15 +123,21 @@ func (cfg *ApiConfig) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	err = cfg.Queries.InsertNewRefreshToken(context.Background(), args)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
-	userData.Password = "*********"
+	userData.Password = realPasswordAndId.HashedPassword
 	userData.Token = token
 	userData.RefreshToken = refreshToken
 
 	respData, err := json.Marshal(userData)
+	if err != nil {
+		http.Error(w, `{"error": "Problem with marshalling answer"}`, http.StatusInternalServerError)
+		logger.Warn(err)
+		return
+	}
 
 	w.Write(respData)
 }
@@ -134,30 +147,34 @@ func (cfg *ApiConfig) HandlerRefresh(w http.ResponseWriter, r *http.Request) {
 	refreshToken := Token{}
 	err := decoder.Decode(&refreshToken)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with decoding json"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
 	tokenInfo, err := cfg.Queries.GetRefreshToken(context.Background(), refreshToken.Token)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, `{"error": "Unauthorized user"}`, http.StatusUnauthorized)
 		logger.Warn(err)
 		return
 	}
 
 	if tokenInfo.RevokedAt.Valid || time.Now().After(tokenInfo.ExpiresAt) {
+		http.Error(w, `{"error": "Unauthorized user"}`, http.StatusUnauthorized)
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	newAccessToken, err := jwt.MakeJWT(tokenInfo.UserID, cfg.SecretJWT, EXPIRESEIN * time.Minute)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with making token"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
 	respData, err := json.Marshal(newAccessToken)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with marshalling answer"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}

@@ -18,26 +18,27 @@ type Item struct {
 func (cfg *ApiConfig) HandlerInsertItem(w http.ResponseWriter, r *http.Request) {
 	token, err := jwt.GetBearerToken(r.Header)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, `{"error": "Unauthorized user"}`, http.StatusUnauthorized)
 		logger.Warn(err)
 		return
 	}
 
 	adminID, err := jwt.ValidateJWT(token, cfg.SecretJWT)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, `{"error": "Unauthorized user"}`, http.StatusUnauthorized)
 		logger.Warn(err)
 		return
 	}
 
 	email, err := cfg.Queries.GetUserEmail(context.Background(), adminID)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
 	if email != cfg.AdminEmail {
-		w.WriteHeader(http.StatusUnavailableForLegalReasons)
+		http.Error(w, `{"error": "Do not have permissions"}`, http.StatusForbidden)
 		logger.Warn(err)
 		return
 	}
@@ -47,6 +48,11 @@ func (cfg *ApiConfig) HandlerInsertItem(w http.ResponseWriter, r *http.Request) 
 	decoder := json.NewDecoder(r.Body)
 
 	err = decoder.Decode(&newItem)
+	if err != nil {
+		http.Error(w, `{"error": "Problem with decoding json"}`, http.StatusInternalServerError)
+		logger.Warn(err)
+		return
+	}
 
 	args := database.InsertItemParams{
 		Name:     newItem.Name,
@@ -56,6 +62,7 @@ func (cfg *ApiConfig) HandlerInsertItem(w http.ResponseWriter, r *http.Request) 
 
 	_, err = cfg.Queries.InsertItem(context.Background(), args)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
@@ -66,23 +73,26 @@ func (cfg *ApiConfig) HandlerInsertItem(w http.ResponseWriter, r *http.Request) 
 func (cfg *ApiConfig) HandlerRevokeToken(w http.ResponseWriter, r *http.Request) {
 	token, err := jwt.GetBearerToken(r.Header)
 	if err != nil {
+		http.Error(w, `{"error": "Unauthorized user"}`, http.StatusUnauthorized)
 		logger.Warn(err)
 		return
 	}
 
 	adminID, err := jwt.ValidateJWT(token, cfg.SecretJWT)
 	if err != nil {
+		http.Error(w, `{"error": "Unauthorized user"}`, http.StatusUnauthorized)
 		logger.Warn(err)
 		return
 	}
 
 	email, err := cfg.Queries.GetUserEmail(context.Background(), adminID)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 	if email != cfg.AdminEmail {
-		w.WriteHeader(http.StatusUnavailableForLegalReasons)
+		http.Error(w, `{"error": "Do not have permissions"}`, http.StatusForbidden)
 		logger.Warn(err)
 		return
 	}
@@ -91,5 +101,5 @@ func (cfg *ApiConfig) HandlerRevokeToken(w http.ResponseWriter, r *http.Request)
 
 	cfg.Queries.RevokeToken(context.Background(), tokenToRevoke)
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNoContent)
 }

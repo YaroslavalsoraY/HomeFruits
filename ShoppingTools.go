@@ -22,12 +22,14 @@ type GetItemParams struct {
 func (cfg *ApiConfig) HandlerGetItems(w http.ResponseWriter, r *http.Request) {
 	items, err := cfg.Queries.GetAllItems(context.Background())
 	if err != nil {
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
 	respData, err := json.Marshal(items)
 	if err != nil {
+		http.Error(w, `{"error": "Problem with marshalling answer"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
@@ -38,59 +40,64 @@ func (cfg *ApiConfig) HandlerGetItems(w http.ResponseWriter, r *http.Request) {
 func (cfg *ApiConfig) HandlerGetShoppingCart(w http.ResponseWriter, r *http.Request) {
 	token, err := jwt.GetBearerToken(r.Header)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, `{"error": "Unauthorized user"}`, http.StatusUnauthorized)
 		logger.Warn(err)
 		return
 	}
 
 	userID, err := jwt.ValidateJWT(token, cfg.SecretJWT)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, `{"error": "Unauthorized user"}`, http.StatusUnauthorized)
 		logger.Warn(err)
 		return
 	}
 
 	shoppingCart, err := cfg.Queries.GetShoppingCart(context.Background(), userID)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
 	respData, err := json.Marshal(shoppingCart)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, `{"error": "Problem with marshalling answer"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusCreated)
 	w.Write(respData)
 }
 
 func (cfg *ApiConfig) HandlerGetInCart(w http.ResponseWriter, r *http.Request) {
 	token, err := jwt.GetBearerToken(r.Header)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, `{"error": "Unauthorized user"}`, http.StatusUnauthorized)
 		logger.Warn(err)
 		return
 	}
 
 	userID, err := jwt.ValidateJWT(token, cfg.SecretJWT)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, `{"error": "Unauthorized user"}`, http.StatusUnauthorized)
 		logger.Warn(err)
 		return
 	}
 
 	itemID, err := uuid.Parse(r.PathValue("itemID"))
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, `{"error": "Problem with parsing request data"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
 	item, err := cfg.Queries.GetItemById(context.Background(), itemID)
+	if err != nil {
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
+		logger.Warn(err)
+		return
+	}
 
 	newItemInCart := GetItemParams{
 		UserID: userID,
@@ -103,13 +110,13 @@ func (cfg *ApiConfig) HandlerGetInCart(w http.ResponseWriter, r *http.Request) {
 
 	err = decoder.Decode(&newItemInCart)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, `{"error": "Problem with decoding json"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
 	if newItemInCart.Quantity > int(item.Quantity) {
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, `{"error": "Incorrect request data"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -123,7 +130,7 @@ func (cfg *ApiConfig) HandlerGetInCart(w http.ResponseWriter, r *http.Request) {
 
 	err = cfg.Queries.AddItemInCart(context.Background(), args)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
@@ -135,32 +142,32 @@ func (cfg *ApiConfig) HandlerGetInCart(w http.ResponseWriter, r *http.Request) {
 
 	err = cfg.Queries.UpdateItemQuantity(context.Background(), updateArgs)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusCreated)
 }
 
 func (cfg *ApiConfig) HandlerDeleteFromCart(w http.ResponseWriter, r *http.Request) {
 	token, err := jwt.GetBearerToken(r.Header)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, `{"error": "Unauthorized user"}`, http.StatusUnauthorized)
 		logger.Warn(err)
 		return
 	}
 
 	userID, err := jwt.ValidateJWT(token, cfg.SecretJWT)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, `{"error": "Unauthorized user"}`, http.StatusUnauthorized)
 		logger.Warn(err)
 		return
 	}
 
 	itemID, err := uuid.Parse(r.PathValue("itemID"))
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, `{"error": "Problem with parsing request data"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
@@ -171,14 +178,14 @@ func (cfg *ApiConfig) HandlerDeleteFromCart(w http.ResponseWriter, r *http.Reque
 	}
 	deletedItem, err := cfg.Queries.DeleteFromCart(context.Background(), args)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
 	realItem, err := cfg.Queries.GetItemById(context.Background(), deletedItem.ItemID)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
@@ -188,10 +195,10 @@ func (cfg *ApiConfig) HandlerDeleteFromCart(w http.ResponseWriter, r *http.Reque
 		ID: deletedItem.ItemID,
 	})
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNoContent)
 }
