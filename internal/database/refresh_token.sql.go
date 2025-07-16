@@ -12,6 +12,16 @@ import (
 	"github.com/google/uuid"
 )
 
+const deleteOldRefreshToken = `-- name: DeleteOldRefreshToken :exec
+DELETE FROM refresh_tokens
+WHERE user_id = $1
+`
+
+func (q *Queries) DeleteOldRefreshToken(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteOldRefreshToken, userID)
+	return err
+}
+
 const getRefreshToken = `-- name: GetRefreshToken :one
 SELECT token, user_id, expires_at, revoked_at FROM refresh_tokens
 WHERE token = $1

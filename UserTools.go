@@ -35,6 +35,18 @@ func (cfg *ApiConfig) HandlerRegUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	exists, err := cfg.Queries.IsEmailExists(context.Background(), newUser.Email)
+	if err != nil {
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
+		logger.Warn(err)
+		return
+	}
+
+	if exists {
+		http.Error(w, `{"error": "User already exists"}`, http.StatusBadRequest)
+		return
+	}
+
 	hashedPassword, err := hashfunc.HashingPassword(newUser.Password)
 	if err != nil {
 		http.Error(w, `{"error": "Problem with hashing provided password"}`, http.StatusInternalServerError)
@@ -93,6 +105,18 @@ func (cfg *ApiConfig) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 		logger.Warn(err)
 		return
 	}
+	
+	exists, err := cfg.Queries.IsEmailExists(context.Background(), userData.Email)
+	if err != nil {
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
+		logger.Warn(err)
+		return
+	}
+
+	if !exists {
+		http.Error(w, `{"error": "Unknow email"}`, http.StatusBadRequest)
+		return
+	}
 
 	realPasswordAndId, err := cfg.Queries.GetUserPassword(context.Background(), userData.Email)
 	if err != nil {
@@ -121,13 +145,21 @@ func (cfg *ApiConfig) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 		UserID:    realPasswordAndId.ID,
 		ExpiresAt: time.Now().Add(EXPIRESEIN * time.Hour * 24),
 	}
+	
+	err = cfg.Queries.DeleteOldRefreshToken(context.Background(), realPasswordAndId.ID)
+	if err != nil {
+		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
+		logger.Warn(err)
+		return
+	}
+	
 	err = cfg.Queries.InsertNewRefreshToken(context.Background(), args)
 	if err != nil {
 		http.Error(w, `{"error": "Problem with database query"}`, http.StatusInternalServerError)
 		logger.Warn(err)
 		return
 	}
-
+	
 	userData.Password = realPasswordAndId.HashedPassword
 	userData.Token = token
 	userData.RefreshToken = refreshToken

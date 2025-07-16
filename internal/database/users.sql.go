@@ -102,3 +102,17 @@ func (q *Queries) GetUserPassword(ctx context.Context, email string) (GetUserPas
 	err := row.Scan(&i.HashedPassword, &i.ID)
 	return i, err
 }
+
+const isEmailExists = `-- name: IsEmailExists :one
+SELECT EXISTS(
+    SELECT id, created_at, updated_at, email, hashed_password FROM users
+    WHERE email = $1
+)
+`
+
+func (q *Queries) IsEmailExists(ctx context.Context, email string) (bool, error) {
+	row := q.db.QueryRowContext(ctx, isEmailExists, email)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}

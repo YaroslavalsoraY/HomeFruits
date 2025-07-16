@@ -19,3 +19,9 @@ WHERE email = $1;
 -- name: GetUserEmail :one
 SELECT email FROM users
 WHERE id = $1;
+
+-- name: IsEmailExists :one
+SELECT EXISTS(
+    SELECT * FROM users
+    WHERE email = $1
+);

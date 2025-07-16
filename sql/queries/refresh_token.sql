@@ -14,3 +14,7 @@ WHERE token = $1;
 UPDATE refresh_tokens
 SET revoked_at = NOW()
 WHERE token = $1;
+
+-- name: DeleteOldRefreshToken :exec
+DELETE FROM refresh_tokens
+WHERE user_id = $1;
